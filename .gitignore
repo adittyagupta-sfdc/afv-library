@@ -205,7 +205,6 @@ pnpm-lock.yaml
 scratch.txt
 notes.txt
 TODO.txt
-.cursor/
 .copilot/
 
 # Test output

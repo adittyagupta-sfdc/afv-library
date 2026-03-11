@@ -453,6 +453,18 @@ To update an existing skill:
 4. Validate using `skills-ref validate ./skills/<category>/<skill-name>`
 5. Commit with clear message: `Update [skill-name]: [what changed]`
 
+### Reviewing Skills Against Best Practices
+
+This repository includes a Cursor rule (`.cursor/rules/reviewing-skill-best-practices.mdc`) that automates skill quality reviews against the documented standards in `skill-best-practices.md`. Use it whenever you add a new skill or make significant changes to an existing one.
+
+To run a review, ask Cursor to **"review the `<skill-name>` skill"** while working in the repository. The rule will:
+
+1. Load `skill-best-practices.md` as the authoritative reference
+2. Evaluate the target `SKILL.md` against criteria covering naming, description, core sections, directory structure, progressive disclosure, context efficiency, tone, formatting, and metadata
+3. Produce a structured report in `reviews/<skill-folder-name>-skill-review.md` with numbered findings, severity ratings (High / Medium / Low), and actionable recommendations
+
+Review reports help catch common issues before pull requests — such as missing gerund naming, absent Validation or Output sections, description phrasing, and missing supporting assets. Address all **High** findings before merging and **Medium** findings when practical.
+
 
 # Experimental 
 
