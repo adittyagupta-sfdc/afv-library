@@ -52,3 +52,7 @@ A sample Custom Agentic Mobile App (CAMA) for rental property tenants. This samp
 ### How it's used
 
 The sample appears on the Agentforce Vibes welcome page under the **Mobile** app type. Users can clone it via the welcome page wizard or directly from this repo.
+
+## agentforce-adlc
+
+Skills for the full Agentforce agent lifecycle (author, discover, scaffold, deploy, test, optimize) designed for use by Claude Code. Unlike the React samples, this is not synced from npm; it is a point-in-time snapshot maintained directly in this repository. See [agentforce-adlc/README.md](agentforce-adlc/README.md) for full details.
