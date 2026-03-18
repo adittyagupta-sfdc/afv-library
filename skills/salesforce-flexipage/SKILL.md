@@ -149,6 +149,68 @@ Every fieldInstance requires:
 - Must have `fieldInstanceProperties` with `uiBehavior`
 - Use `Record.{Field}` format
 
+### 5. Unique Identifiers and Region Names (CRITICAL - PREVENTS DUPLICATE ERRORS)
+
+**EVERY identifier and region/facet name MUST be unique across the entire FlexiPage file.**
+
+**Critical Rules:**
+- ❌ **NEVER create two `<flexiPageRegions>` blocks with the same `<name>`**
+- ✅ **If multiple components belong to same facet, combine them in ONE region with multiple `<itemInstances>`**
+- ❌ **NEVER reuse the same `<identifier>` value**
+- ✅ **Always read entire file first and extract ALL existing identifiers and names**
+
+**Wrong - This WILL FAIL with duplicate name error:**
+```xml
+<!-- First field section in detail tab -->
+<flexiPageRegions>
+   <itemInstances>
+      <componentInstance>
+         <identifier>flexipage_property_details_fieldSection</identifier>
+         ...
+      </componentInstance>
+   </itemInstances>
+   <name>detailTabContent</name>  <!-- ❌ DUPLICATE NAME -->
+   <type>Facet</type>
+</flexiPageRegions>
+
+<!-- Second field section in detail tab -->
+<flexiPageRegions>
+   <itemInstances>
+      <componentInstance>
+         <identifier>flexipage_pricing_fieldSection</identifier>
+         ...
+      </componentInstance>
+   </itemInstances>
+   <name>detailTabContent</name>  <!-- ❌ DUPLICATE NAME - DEPLOYMENT FAILS -->
+   <type>Facet</type>
+</flexiPageRegions>
+```
+
+**Correct - Combine itemInstances in ONE region:**
+```xml
+<!-- Both field sections in same detail tab facet -->
+<flexiPageRegions>
+   <itemInstances>
+      <componentInstance>
+         <identifier>flexipage_property_details_fieldSection</identifier>
+         ...
+      </componentInstance>
+   </itemInstances>
+   <itemInstances>
+      <componentInstance>
+         <identifier>flexipage_pricing_fieldSection</identifier>
+         ...
+      </componentInstance>
+   </itemInstances>
+   <name>detailTabContent</name>  <!-- ✅ ONE REGION, MULTIPLE COMPONENTS -->
+   <type>Facet</type>
+</flexiPageRegions>
+```
+
+**When to combine vs separate:**
+- **Combine**: Components that logically belong to same tab/section (e.g., multiple field sections in detail tab)
+- **Separate**: Components that belong to different tabs/sections (e.g., `detailTabContent` vs `relatedTabContent`)
+
 ---
 
 ## Common Deployment Errors
@@ -178,7 +240,7 @@ Every fieldInstance requires:
 **Fix:** Use "Volunteer_Record_Page" not "Volunteer__c_Record_Page"
 
 ### "Region specifies mode that parent doesn't support"
-**Cause:** Added `<mode>` tag to region  
+**Cause:** Added `<mode>` tag to region
 **Fix:** Remove `<mode>` tags - they're not needed for standard regions
 
 ---
@@ -211,27 +273,41 @@ When user provides an existing FlexiPage file path:
 
 1. **Read the file** using native file I/O
 2. **Parse XML** to extract:
-   - Existing component identifiers
+   - **ALL existing component identifiers** (search for all `<identifier>` tags)
+   - **ALL existing region/facet names** (search for all `<name>` tags in `<flexiPageRegions>`)
    - Available regions (parse from file, don't assume names)
    - Existing facets
-3. **Generate component XML** (apply all rules from "Critical XML Rules" section)
-4. **Insert** into appropriate region
-5. **Write** modified XML back to file
-6. **Deploy**: `sf project deploy start --source-dir force-app/...`
+3. **Verify uniqueness** - ensure your new identifiers and names don't conflict with ANY existing ones
+4. **Check if target facet exists** - if adding to a named facet like `detailTabContent` that already exists:
+   - **Add new `<itemInstances>` to existing region** (don't create duplicate region)
+   - **Insert before the closing `</flexiPageRegions>` tag of that region**
+5. **Generate component XML** (apply all rules from "Critical XML Rules" section)
+6. **Insert** into appropriate region or add itemInstances to existing facet
+7. **Write** modified XML back to file
+8. **Deploy**: `sf project deploy start --source-dir force-app/...`
 
 ---
 
 ### Generating Unique Identifiers
 
+**CRITICAL: Before generating ANY new identifier or facet name, you MUST:**
+1. Read the entire FlexiPage file
+2. Extract ALL existing `<identifier>` values
+3. Extract ALL existing `<name>` values from `<flexiPageRegions>` blocks
+4. Verify your new identifiers/names are unique across the ENTIRE file
+
 **Algorithm**:
 ```
-1. Extract all existing <identifier> values from XML
+1. Extract ALL existing <identifier> AND <name> values from XML
 2. Generate base name: {componentType}_{context}
    Examples: "relatedList_contacts", "richText_header", "tabs_main"
 3. Find first available number:
    - Try "{base}_1"
    - If exists, try "{base}_2", "{base}_3", etc.
    - Use first available
+4. Never use same identifier even if identifier is in different region or in iteminstance or in component
+5. Never use same facet/region name even if in different sections
+6. If adding to existing named facet (e.g., detailTabContent), add itemInstances to that region - don't create new region
 ```
 
 **Examples**:
@@ -252,6 +328,50 @@ When user provides an existing FlexiPage file path:
    - Format: `Facet-{8hex}-{4hex}-{4hex}-{4hex}-{12hex}`
    - Example: `Facet-66d5a4b3-bf14-4665-ba75-1ceaa71b2cde`
    - Use for field section columns, nested containers, anonymous slots
+
+**Critical Rule - Combining Multiple Components in Same Facet**:
+
+When multiple components logically belong to the same named facet, **combine them in ONE `<flexiPageRegions>` block with multiple `<itemInstances>`** - DO NOT create separate regions with the same name.
+
+**Example - Multiple field sections in detail tab:**
+```xml
+<!-- ✅ CORRECT: One region, multiple itemInstances -->
+<flexiPageRegions>
+   <itemInstances>
+      <componentInstance>
+         <componentName>flexipage:fieldSection</componentName>
+         <identifier>flexipage_property_details_fieldSection</identifier>
+         ...
+      </componentInstance>
+   </itemInstances>
+   <itemInstances>
+      <componentInstance>
+         <componentName>flexipage:fieldSection</componentName>
+         <identifier>flexipage_pricing_fieldSection</identifier>
+         ...
+      </componentInstance>
+   </itemInstances>
+   <name>detailTabContent</name>
+   <type>Facet</type>
+</flexiPageRegions>
+
+<!-- ❌ WRONG: Two regions with same name - DEPLOYMENT FAILS -->
+<flexiPageRegions>
+   <itemInstances>...</itemInstances>
+   <name>detailTabContent</name>
+   <type>Facet</type>
+</flexiPageRegions>
+<flexiPageRegions>
+   <itemInstances>...</itemInstances>
+   <name>detailTabContent</name>  <!-- DUPLICATE - ERROR -->
+   <type>Facet</type>
+</flexiPageRegions>
+```
+
+**When adding components to existing files:**
+- **Check if target facet name already exists**
+- If exists: Add new `<itemInstances>` to that existing region
+- If doesn't exist: Create new region with unique name
 
 ---
 
@@ -401,6 +521,9 @@ Identifier Pattern: flexipage_richText or flexipage_richText_{sequence}
 
 Before deploying:
 - [ ] Used CLI to bootstrap (don't start from scratch)
+- [ ] **ALL identifiers are unique** - no duplicate `<identifier>` values anywhere in file
+- [ ] **ALL region/facet names are unique** - no duplicate `<name>` values in `<flexiPageRegions>`
+- [ ] **Multiple components in same facet are combined** - ONE region with multiple `<itemInstances>`, NOT separate regions with same name
 - [ ] All field references use `Record.{Field}` format
 - [ ] Each fieldInstance has `fieldInstanceProperties` with `uiBehavior`
 - [ ] Each fieldInstance in own `<itemInstances>` wrapper
