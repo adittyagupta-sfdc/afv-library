@@ -1,114 +1,31 @@
 ---
-name: generating-flexipage
-description: "Use this skill when users need to create, generate, modify, or validate Salesforce Lightning pages (FlexiPages). Trigger when users mention RecordPage, AppPage, HomePage, Lightning pages, page layouts, adding components to pages, or page customization. Also use when users say things like 'create a Lightning page', 'add a component to a page', 'customize the record page', 'generate a FlexiPage', or when they're working with FlexiPage XML files and need help with components, regions, or deployment errors. Always use this skill for any FlexiPage-related work, even if they just mention 'page' in the context of Salesforce."
+name: salesforce-flexipage
+description: Generate valid, deployable Salesforce Lightning Page (FlexiPage) metadata XML. Always use this skill when working with .flexipage-meta.xml files. Trigger when users mention Lightning pages, creating pages, adding components to pages, or page customization. Always use this skill for any FlexiPage-related work, even if they just mention "page" in the context of Salesforce.
 ---
+
+# CONTEXT
 
 ## When to Use This Skill
 
 Use this skill when you need to:
-- Create Lightning pages (RecordPage, AppPage, HomePage)
-- Generate FlexiPage metadata XML
-- Add components to existing FlexiPages
+- Edit ANY `*.flexipage-meta.xml` file
+- Create new Lightning Pages (FlexiPages) for records, apps, or home pages
+- Edit existing pages by adding or changing components
 - Troubleshoot FlexiPage deployment errors
-- Understand FlexiPage structure and component configuration
-- Work with page layouts or Lightning page customization
-- Edit or update ANY *.flexipage-meta.xml file
 
-## Specification
+## Goal
 
-# FlexiPage Generation Guide
+Generate valid, deployable FlexiPage metadata XML using CLI bootstrapping, with incremental enhancement and deployment. Ensure all generated XML follows Salesforce metadata conventions and passes deployment validation.
 
 ## Overview
 
-**CRITICAL: When creating NEW FlexiPages, you MUST ALWAYS start with the CLI template command.** Never create FlexiPage XML from scratch - the CLI provides valid structure, proper regions, and correct component configuration that prevents deployment errors.
+Generate Lightning Pages (RecordPage, AppPage, HomePage) using CLI bootstrapping for component discovery and configuration.
 
-Generate Lightning pages (RecordPage, AppPage, HomePage) using CLI bootstrapping for component discovery and configuration.
-
----
-
-## Quick Start Workflow
-
-### Step 1: Bootstrap with CLI
-
-**MANDATORY FOR NEW PAGES: This step is NOT optional.** Always use the CLI template command when creating a new FlexiPage. The CLI generates valid XML structure, proper regions, and correct metadata that prevents common deployment errors. Only skip this step if you're editing an existing FlexiPage file.
-
-```bash
-sf template generate flexipage \
-  --name <PageName> \
-  --template <RecordPage|AppPage|HomePage> \
-  --sobject <SObject> \
-  --primary-field <Field1> \
-  --secondary-fields <Field2,Field3> \
-  --detail-fields <Field4,Field5,Field6,Field7> \
-  --output-dir force-app/main/default/flexipages
-```
-
-**CRITICAL:** If the `sf template generate flexipage` command fails, **STOP**.
-
-1. Install the templates plugin:
-   ```bash
-   sf plugins install templates
-   ```
-2. Retry the `sf template generate flexipage` command
-3. Verify the FlexiPage XML file was created
-
-Do NOT continue to Step 2 until the template command succeeds. The generated XML is required for the entire workflow.
-
-#### **Template-specific requirements**
-
-**RecordPage:**
-- Requires `--sobject` (e.g., Account, Custom_Object__c)
-- Requires field parameters:
-  - `--primary-field`: Most important identifying field (e.g., Name)
-  - `--secondary-fields`: Record summary (recommended 4-6, max 12)
-  - `--detail-fields`: Full record details, including required fields (e.g., Name)
-
-**AppPage:**
-- No additional requirements
-
-**HomePage:**
-- No additional requirements
-
-#### **Field Selection Rules**
-- **Validate fields exist**: Use MCP tools or describe commands to discover available fields for the object before specifying them in the command
-- **Prefer compound fields**: Use `Name` (not `FirstName`/`LastName`), `BillingAddress` (not `BillingStreet`/`BillingCity`/`BillingState`), `MailingAddress`, etc. when available
-- **Include required fields in detail-fields**: Always include object required fields (like `Name`) in the `--detail-fields` parameter, even if they're also used in `--primary-field` or `--secondary-fields`
-
-#### **What you get**
-- Valid FlexiPage XML with correct structure
-- Pre-configured regions and basic components
-- Proper field references and facet structure
-- Ready to deploy as-is or enhance further
-
-### Step 2: Deploy Base Page
-
-Run a **dry-run** deployment of the entire project to validate the page and dependencies:
-```bash
-sf project deploy start --dry-run -d "force-app/main/default" --test-level NoTestRun --wait 10 --json
-```
-
-**Critical:** Fix any deployment errors before proceeding. The page must validate successfully.
-
-### Step 3: **STOP - No Further Modifications**
-
-**MANDATORY: Stop after Step 2. Do not add components or edit the FlexiPage XML.**
-
-This applies even if the user requested:
-- Additional components
-- Page customization
-- Component configuration
-
-What you CAN do:
-- Suggest what components would be useful
-- Explain what enhancements are possible
-- Document what would need to be added manually
-
-What you CANNOT do:
-- Modify the XML file
-- Add any components
-- Make any enhancements
+**Terminology:** Lightning Pages are the marketing/UX name for FlexiPage metadata. Users may refer to them simply as "pages", "Lightning pages", or "FlexiPages". The metadata type is `FlexiPage` and files use the `.flexipage-meta.xml` extension.
 
 ---
+
+# CRITICAL FOUNDATION (Read First!)
 
 ## Critical XML Rules
 
@@ -138,14 +55,14 @@ What you CANNOT do:
 
 ### 2. Field References
 
-**ALWAYS:** `Record.{FieldApiName}`  
+**ALWAYS:** `Record.{FieldApiName}`
 **NEVER:** `{ObjectName}.{FieldApiName}`
 
 ```xml
 <!-- Correct -->
 <fieldItem>Record.Name</fieldItem>
 
-        <!-- Wrong -->
+<!-- Wrong -->
 <fieldItem>Account.Name</fieldItem>
 ```
 
@@ -167,7 +84,7 @@ What you CANNOT do:
 
 ### 4. fieldInstance Structure
 
-Every fieldInstance requires:
+Ensure every fieldInstance includes:
 ```xml
 <itemInstances>
    <fieldInstance>
@@ -182,117 +99,145 @@ Every fieldInstance requires:
 ```
 
 **Rules:**
-- Each fieldInstance in its own `<itemInstances>` wrapper
-- Must have `fieldInstanceProperties` with `uiBehavior`
-- Use `Record.{Field}` format
-
-### 5. Unique Identifiers and Region Names (CRITICAL - PREVENTS DUPLICATE ERRORS)
-
-**EVERY identifier and region/facet name MUST be unique across the entire FlexiPage file.**
-
-**Critical Rules:**
-- ❌ **NEVER create two `<flexiPageRegions>` blocks with the same `<name>`**
-- ✅ **If multiple components belong to same facet, combine them in ONE region with multiple `<itemInstances>`**
-- ❌ **NEVER reuse the same `<identifier>` value**
-- ✅ **Always read entire file first and extract ALL existing identifiers and names**
-
-**Wrong - This WILL FAIL with duplicate name error:**
-```xml
-<!-- First field section in detail tab -->
-<flexiPageRegions>
-   <itemInstances>
-      <componentInstance>
-         <identifier>flexipage_property_details_fieldSection</identifier>
-         ...
-      </componentInstance>
-   </itemInstances>
-   <name>detailTabContent</name>  <!-- ❌ DUPLICATE NAME -->
-   <type>Facet</type>
-</flexiPageRegions>
-
-<!-- Second field section in detail tab -->
-<flexiPageRegions>
-   <itemInstances>
-      <componentInstance>
-         <identifier>flexipage_pricing_fieldSection</identifier>
-         ...
-      </componentInstance>
-   </itemInstances>
-   <name>detailTabContent</name>  <!-- ❌ DUPLICATE NAME - DEPLOYMENT FAILS -->
-   <type>Facet</type>
-</flexiPageRegions>
-```
-
-**Correct - Combine itemInstances in ONE region:**
-```xml
-<!-- Both field sections in same detail tab facet -->
-<flexiPageRegions>
-   <itemInstances>
-      <componentInstance>
-         <identifier>flexipage_property_details_fieldSection</identifier>
-         ...
-      </componentInstance>
-   </itemInstances>
-   <itemInstances>
-      <componentInstance>
-         <identifier>flexipage_pricing_fieldSection</identifier>
-         ...
-      </componentInstance>
-   </itemInstances>
-   <name>detailTabContent</name>  <!-- ✅ ONE REGION, MULTIPLE COMPONENTS -->
-   <type>Facet</type>
-</flexiPageRegions>
-```
-
-**When to combine vs separate:**
-- **Combine**: Components that logically belong to same tab/section (e.g., multiple field sections in detail tab)
-- **Separate**: Components that belong to different tabs/sections (e.g., `detailTabContent` vs `relatedTabContent`)
+- Place each fieldInstance in its own `<itemInstances>` wrapper
+- Always include `fieldInstanceProperties` with `uiBehavior`
+- Always use `Record.{Field}` format
 
 ---
 
-## Common Deployment Errors
+## Component-Specific Rules
 
-### "We couldn't retrieve or load the information on the field"
-**Cause:** Invalid field API name - field doesn't exist on the object or has incorrect spelling
-**Fix:** Use MCP tools or describe commands to discover valid fields, then update the field reference (see Field Selection Rules)
+**REQUIRED READING:** Before working with ANY component, you MUST read the relevant documentation files. This is NOT optional.
 
-### "Invalid field reference"
-**Cause:** Used `ObjectName.Field` instead of `Record.Field`  
-**Fix:** Change to `Record.{FieldApiName}`
+### Mandatory Documentation by Component Type
 
-### "Element fieldInstance is duplicated"
-**Cause:** Multiple fieldInstances in one itemInstances  
-**Fix:** Each fieldInstance needs its own `<itemInstances>` wrapper
+**Container Components** (tabs, accordions, field sections):
+- **MUST READ:** `examples/container-facets-example.xml`
+- This shows the correct facet structure that is required for all container components
+- Read this BEFORE generating any container component XML
 
-### "Missing fieldInstanceProperties"
-**Cause:** No uiBehavior specified  
-**Fix:** Add `fieldInstanceProperties` with `uiBehavior`
+**Related Lists** (`lst:dynamicRelatedList`):
+- **MUST READ:** `docs/components/lst-dynamicRelatedList.md`
+- Contains critical rules for `parentFieldApiName`, `relatedListApiName`, and field configuration
+- Inform the user you've read this file (the file itself requires this)
 
-### "Unused Facet"
-**Cause:** Facet defined but not referenced by any component  
-**Fix:** Remove Facet or reference it in a component property
+**Other Component Documentation:**
+- `record_flexipage-dynamicHighlights.md` - RecordPage header / summary (MUST read when working with highlights)
+- `flexipage-fieldSection.md` - Field display columns (MUST read when working with field sections)
+- `flexipage-richText.md` - Rich text content (MUST read when working with rich text)
 
-### "XML parsing error"
-**Cause:** Unencoded HTML/XML in property values  
-**Fix:** Manually encode `<`, `>`, `&`, `"`, `'` in all `<value>` tags
-
-### "Cannot create component with namespace"
-**Cause:** Invalid page name (don't use `__c` suffix in page names)  
-**Fix:** Use "Volunteer_Record_Page" not "Volunteer__c_Record_Page"
-
-### "Region specifies mode that parent doesn't support"
-**Cause:** Added `<mode>` tag to region
-**Fix:** Remove `<mode>` tags - they're not needed for standard regions
+**General Rule:** For ANY component listed above, you MUST read its documentation file BEFORE generating XML. For components without specific documentation, apply the general Critical XML Rules.
 
 ---
 
-### Generating Unique Identifiers
+## Component Selection Guidelines
 
-**CRITICAL: Before generating ANY new identifier or facet name, follow the rules in section 5 of "Critical XML Rules" above.**
+When choosing components, prefer the following options for better performance and flexibility:
 
-**Identifier Generation Algorithm**:
+1. **Related Lists:** ALWAYS use `lst:dynamicRelatedList` for related lists. Do NOT use `force:relatedListQuickLink` or `force:relatedListSingleContainer`. The `lst:dynamicRelatedList` component is more performant and offers more FlexiPage configuration options. When using this component, you MUST read `docs/components/lst-dynamicRelatedList.md` before proceeding.
+
+2. **Field Display:** Prefer field sections with specific fields over `force:detailPanel`. Field sections provide more versatility and control over layout and field behavior.
+
+---
+
+# MAIN WORKFLOWS
+
+## Decision Tree: New Page or Existing Page?
+
+**Does the FlexiPage file already exist?**
+
+- **NO** → Use "Creating New Pages" workflow below (bootstrap first, then add components)
+- **YES** → Skip to "Adding/Editing Components" workflow (no bootstrap needed)
+
+---
+
+## Creating New Pages
+
+**Use this workflow when the `.flexipage-meta.xml` file does NOT exist yet.**
+
+### Step 1: Bootstrap with CLI
+
+```bash
+sf template generate flexipage \
+  --name <PageName> \
+  --template <RecordPage|AppPage|HomePage> \
+  --sobject <SObject> \
+  --primary-field <Field1> \
+  --secondary-fields <Field2,Field3> \
+  --detail-fields <Field4,Field5,Field6,Field7> \
+  --output-dir force-app/main/default/flexipages
 ```
-1. Extract ALL existing <identifier> AND <name> values from XML
+
+**Template-specific requirements:**
+- **RecordPage**: Requires `--sobject` (e.g., Account, Custom_Object__c)
+- **RecordPage**: Requires `--primary-field` and `--secondary-fields` for dynamic highlights, `--detail-fields` for full record details. Use the most important identifying field as primary, e.g. Name. Use the secondary fields (max 12, recommended 4-6) to show a summary of the record. Use detail fields to show the full details of the record.
+- **AppPage**: No additional requirements
+- **HomePage**: No additional requirements
+
+**Note:** If the `sf template generate flexipage` command fails, recommend users upgrade to the latest version of the Salesforce CLI:
+```bash
+npm install -g @salesforce/cli@latest
+```
+
+**What you get:**
+- Valid FlexiPage XML with correct structure
+- Pre-configured regions and basic components
+- Proper field references and facet structure
+- Ready to deploy as-is or enhance further
+
+### Step 2: Deploy Base Page
+
+```bash
+sf project deploy start --dry-run --source-dir force-app/main/default/flexipages
+```
+
+**Deploy early, deploy often.** Start with the bootstrapped page, validate it works, then enhance.
+
+### Step 3: Add More Components (if needed)
+
+If the user wants to add additional components beyond what the CLI generated, proceed to the "Adding/Editing Components" workflow below. The process is identical whether you just bootstrapped a new page or are working with an existing page.
+
+---
+
+## Adding/Editing Components
+
+**Use this workflow when:**
+- The FlexiPage file already exists, OR
+- You've just bootstrapped a new page and need to add more components
+
+### Workflow Steps
+
+1. **Read the FlexiPage file** using native file I/O
+2. **Parse XML** to extract:
+   - Existing component identifiers
+   - Available regions (parse from file, don't assume names)
+   - Existing facets
+3. **Select component** based on the user's request
+4. **READ REQUIRED DOCUMENTATION** - See "Component-Specific Rules" section and read ALL relevant documentation files for your component type (this is MANDATORY, not optional)
+5. **Generate component XML** using only known, valid properties (apply all rules from "Critical XML Rules" section AND component-specific documentation)
+6. **Insert** into appropriate region
+7. **Write** modified XML back to file
+8. **Deploy**: `sf project deploy start --source-dir force-app/...`
+
+---
+
+# IMPLEMENTATION DETAILS
+
+## Container Components with Facets
+
+When generating tabs, accordions, or field sections, always create corresponding facet regions. Components like these require facets to define content areas.
+
+**Critical**: Facet regions are siblings of template regions at the same level, not nested inside them.
+
+**MANDATORY**: Before generating ANY container component, you MUST read [examples/container-facets-example.xml](examples/container-facets-example.xml). This file shows the exact structure required for container components with facets. Reading this file is NOT optional.
+
+---
+
+## Generating Unique Identifiers
+
+**Algorithm**:
+```
+1. Extract all existing <identifier> values from XML
 2. Generate base name: {componentType}_{context}
    Examples: "relatedList_contacts", "richText_header", "tabs_main"
 3. Find first available number:
@@ -320,21 +265,16 @@ Every fieldInstance requires:
    - Example: `Facet-66d5a4b3-bf14-4665-ba75-1ceaa71b2cde`
    - Use for field section columns, nested containers, anonymous slots
 
-**When adding components to existing files:**
-- Check if target facet name already exists
-- If exists: Add new `<itemInstances>` to that existing region (see section 5 above for details)
-- If doesn't exist: Create new region with unique name
-
 ---
 
-### Region Selection
+## Region Selection
 
-**Parse regions from file** - don't hardcode names. Templates vary:
+Always parse regions from the file - never hardcode region names. Templates vary:
 - `flexipage:recordHomeTemplateDesktop` → `header`, `main`, `sidebar`
 - `runtime_service_fieldservice:...` → `header`, `main`, `footer`
 - Others may have different region names
 
-**Default placement**: End of target region (after last `<itemInstances>`)
+Place new components at the end of the target region (after last `<itemInstances>`)
 
 **Insertion pattern**:
 ```xml
@@ -351,101 +291,53 @@ Every fieldInstance requires:
 
 ---
 
-### Container Components with Facets
+# QUALITY & DEPLOYMENT
 
-Components like tabs, accordions, field sections require facets.
+## Incremental Development Pattern
 
-**Pattern**:
-```xml
-<!-- 1. Component in region -->
-<flexiPageRegions>
-   <itemInstances>
-      <componentInstance>
-         <componentName>flexipage:tabset2</componentName>
-         <identifier>tabs_main_1</identifier>
-         <componentInstanceProperties>
-            <name>tabs</name>
-            <value>tab1_content</value>
-            <value>tab2_content</value>
-         </componentInstanceProperties>
-      </componentInstance>
-   </itemInstances>
-   <name>main</name>
-   <type>Region</type>
-</flexiPageRegions>
+**Philosophy:** Deploy small, working increments. Don't build entire complex page at once.
 
-        <!-- 2. Facets (siblings of region, NOT nested inside) -->
-<flexiPageRegions>
-<itemInstances><!-- Tab 1 content --></itemInstances>
-<name>tab1_content</name>
-<type>Facet</type>
-</flexiPageRegions>
+**Process:**
+1. **For new pages: CLI bootstrap** → Deploy base page
+2. **Add one component** → Deploy
+3. **Add another component** → Deploy
+4. **Repeat** until complete
 
-<flexiPageRegions>
-<itemInstances><!-- Tab 2 content --></itemInstances>
-<name>tab2_content</name>
-<type>Facet</type>
-</flexiPageRegions>
-```
+**Benefits:**
+- Isolated errors (know exactly what broke)
+- Faster debugging
+- Build confidence with each success
+- Get user feedback early
 
-**Critical**: Facet regions are siblings of template regions at the same level, not nested inside them.
----
-## Component-Specific Tips
-### dynamicHighlights (RecordPage Header)
-**Location:** Must be in `header` region.
-**Explicit Fields** (via CLI): Use the most important fields to show a summary of the record. The single primary field is used to identify the record, like a name. The secondary fields (max 12, recommended 6) are used as a summary of the record.
-```bash
---primary-field Name
---secondary-fields Phone,Industry,AnnualRevenue
-```
-CLI generates Facets with field references automatically.
-### fieldSection
-**Use for:** Displaying fields in columns.
-**Structure:** Three-level nesting:
-1. Template Region (Region type)
-2. Column Facets (Facet type)
-3. Field Facets (Facet type)
-   **Referenced in component property:**
-```xml
-<componentInstanceProperties>
-   <name>columns</name>
-   <value>Facet-{uuid}</value>
-</componentInstanceProperties>
-```
-
-### rich Text component
-
-Component name: flexipage:richText
-
-Use for: Displaying HTML-formatted rich text content with support for text formatting, headings, lists, tables, images, links, forms, and multimedia elements. Preserves styling and layout. Escape all special characters in the default text.
-
-Location: Can be used in any region on any page type (Home, Record, App, Community pages).
-
-
-CLI generates the component directly without nested structures.
-
-User: "Add a rich text component to force-app/.../Account_Record_Page.flexipage-meta.xml"
-
-Structure: Single-level component (no facets):
-1. Component instance (flexipage:richText) with direct properties
-
-XML Structure Example:
-```xml
-<itemInstances>
-   <componentInstance>
-      <componentInstanceProperties>
-         <name>decorate</name>
-         <value>true</value>
-      </componentInstanceProperties>
-      <componentName>flexipage:richText</componentName>
-      <identifier>flexipage_richText</identifier>
-   </componentInstance>
-</itemInstances>
-```
-
-Identifier Pattern: flexipage_richText or flexipage_richText_{sequence}
+**Anti-pattern:** Building entire complex page → one giant error cascade.
 
 ---
+
+## Validation Checklist
+
+Before deploying:
+- [ ] If creating new page: Used CLI to bootstrap (don't start from scratch)
+- [ ] All field references use `Record.{Field}` format
+- [ ] Each fieldInstance has `fieldInstanceProperties` with `uiBehavior`
+- [ ] Each fieldInstance in own `<itemInstances>` wrapper
+- [ ] Template regions use `<type>Region</type>`
+- [ ] Component facets use `<type>Facet</type>`
+- [ ] Component-specific docs have been read for each component and all rules followed
+- [ ] Property values with HTML/XML are manually encoded
+- [ ] No `<mode>` tags in regions
+- [ ] No `__c` suffix in page names
+- [ ] Each Facet referenced by exactly one component property
+
+---
+
+## Common Deployment Errors
+
+See [docs/common-deployment-errors.md](docs/common-deployment-errors.md) for detailed error patterns, causes, and fixes.
+
+---
+
+# REFERENCE
+
 ## Required Metadata Structure
 
 ```xml
@@ -469,52 +361,6 @@ Identifier Pattern: flexipage_richText or flexipage_richText_{sequence}
 
 ---
 
-## Validation Checklist
+## Output
 
-Before deploying:
-- [ ] **[NEW PAGES ONLY]** Used CLI to bootstrap - NEVER create FlexiPage XML from scratch
-- [ ] **ALL identifiers are unique** - no duplicate `<identifier>` values anywhere in file
-- [ ] **ALL region/facet names are unique** - no duplicate `<name>` values in `<flexiPageRegions>`
-- [ ] **Multiple components in same facet are combined** - ONE region with multiple `<itemInstances>`, NOT separate regions with same name
-- [ ] All field references use `Record.{Field}` format
-- [ ] Each fieldInstance has `fieldInstanceProperties` with `uiBehavior`
-- [ ] Each fieldInstance in own `<itemInstances>` wrapper
-- [ ] Template regions use `<type>Region</type>`
-- [ ] Component facets use `<type>Facet</type>`
-- [ ] Property values with HTML/XML are manually encoded
-- [ ] No `<mode>` tags in regions
-- [ ] No `__c` suffix in page names
-- [ ] Each Facet referenced by exactly one component property
-
----
-
-## Quick Reference: CLI Command
-
-```bash
-# RecordPage with fields
-sf template generate flexipage \
-  --name Account_Custom_Page \
-  --template RecordPage \
-  --sobject Account \
-  --primary-field Name \
-  --secondary-fields Phone,Industry,AnnualRevenue \
-  --detail-fields Street,City,State,Name,Phone,Email
-
-# AppPage
-sf template generate flexipage \
-  --name Sales_Dashboard \
-  --template AppPage \
-  --label "Sales Dashboard"
-
-# HomePage
-sf template generate flexipage \
-  --name Custom_Home \
-  --template HomePage \
-  --description "Custom home for sales team"
-```
-
-**All templates support:**
-- `--output-dir` (default: current directory)
-- `--api-version` (default: latest)
-- `--label` (default: page name)
-- `--description`
+A valid `.flexipage-meta.xml` file containing properly structured FlexiPage XML with correct region types, field references, component identifiers, and encoded property values
